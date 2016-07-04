@@ -87,7 +87,7 @@ func (g *gcmAsm) Seal(dst, nonce, plaintext, data []byte) []byte {
 
 	aesEncBlock(&tagMask, &counter, g.ks)
 
-	var tagOut [gcmTagSize]byte
+	var tagOut [16]byte
 	gcmAesData(&g.productTable, data, &tagOut)
 
 	ret, out := sliceForAppend(dst, len(plaintext)+gcmTagSize)
@@ -95,7 +95,7 @@ func (g *gcmAsm) Seal(dst, nonce, plaintext, data []byte) []byte {
 		gcmAesEnc(&g.productTable, out, plaintext, &counter, &tagOut, g.ks)
 	}
 	gcmAesFinish(&g.productTable, &tagMask, &tagOut, uint64(len(plaintext)), uint64(len(data)))
-	copy(out[len(plaintext):], tagOut[:])
+	copy(out[len(plaintext):], tagOut[:gcmTagSize])
 
 	return ret
 }
@@ -128,7 +128,7 @@ func (g *gcmAsm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 
 	aesEncBlock(&tagMask, &counter, g.ks)
 
-	var expectedTag [gcmTagSize]byte
+	var expectedTag [16]byte
 	gcmAesData(&g.productTable, data, &expectedTag)
 
 	ret, out := sliceForAppend(dst, len(ciphertext))
@@ -137,7 +137,7 @@ func (g *gcmAsm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	}
 	gcmAesFinish(&g.productTable, &tagMask, &expectedTag, uint64(len(ciphertext)), uint64(len(data)))
 
-	if subtle.ConstantTimeCompare(expectedTag[:], tag) != 1 {
+	if subtle.ConstantTimeCompare(expectedTag[:12], tag) != 1 {
 		for i := range out {
 			out[i] = 0
 		}

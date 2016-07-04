@@ -119,7 +119,7 @@ func NewGCMWithNonceSize(cipher Block, size int) (AEAD, error) {
 
 const (
 	gcmBlockSize         = 16
-	gcmTagSize           = 16
+	gcmTagSize           = 12
 	gcmStandardNonceSize = 12
 )
 
@@ -135,7 +135,7 @@ func (g *gcm) Seal(dst, nonce, plaintext, data []byte) []byte {
 	if len(nonce) != g.nonceSize {
 		panic("cipher: incorrect nonce length given to GCM")
 	}
-	ret, out := sliceForAppend(dst, len(plaintext)+gcmTagSize)
+	ret, out := sliceForAppend(dst, len(plaintext)+gcmBlockSize)
 
 	var counter, tagMask [gcmBlockSize]byte
 	g.deriveCounter(&counter, nonce)
@@ -146,7 +146,7 @@ func (g *gcm) Seal(dst, nonce, plaintext, data []byte) []byte {
 	g.counterCrypt(out, plaintext, &counter)
 	g.auth(out[len(plaintext):], out[:len(plaintext)], data, &tagMask)
 
-	return ret
+	return ret[:len(ret)-4]
 }
 
 var errOpen = errors.New("cipher: message authentication failed")
@@ -168,12 +168,12 @@ func (g *gcm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	g.cipher.Encrypt(tagMask[:], counter[:])
 	gcmInc32(&counter)
 
-	var expectedTag [gcmTagSize]byte
+	var expectedTag [gcmBlockSize]byte
 	g.auth(expectedTag[:], ciphertext, data, &tagMask)
 
 	ret, out := sliceForAppend(dst, len(ciphertext))
 
-	if subtle.ConstantTimeCompare(expectedTag[:], tag) != 1 {
+	if subtle.ConstantTimeCompare(expectedTag[:gcmTagSize], tag) != 1 {
 		// The AESNI code decrypts and authenticates concurrently, and
 		// so overwrites dst in the event of a tag mismatch. That
 		// behaviour is mimicked here in order to be consistent across
@@ -358,7 +358,7 @@ func (g *gcm) deriveCounter(counter *[gcmBlockSize]byte, nonce []byte) {
 
 // auth calculates GHASH(ciphertext, additionalData), masks the result with
 // tagMask and writes the result to out.
-func (g *gcm) auth(out, ciphertext, additionalData []byte, tagMask *[gcmTagSize]byte) {
+func (g *gcm) auth(out, ciphertext, additionalData []byte, tagMask *[gcmBlockSize]byte) {
 	var y gcmFieldElement
 	g.update(&y, additionalData)
 	g.update(&y, ciphertext)
