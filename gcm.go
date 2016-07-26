@@ -135,7 +135,7 @@ func (g *gcm) Seal(dst, nonce, plaintext, data []byte) []byte {
 	if len(nonce) != g.nonceSize {
 		panic("cipher: incorrect nonce length given to GCM")
 	}
-	ret, out := sliceForAppend(dst, len(plaintext)+gcmBlockSize)
+	ret, out := sliceForAppend(dst, len(plaintext)+gcmTagSize)
 
 	var counter, tagMask [gcmBlockSize]byte
 	g.deriveCounter(&counter, nonce)
@@ -144,9 +144,12 @@ func (g *gcm) Seal(dst, nonce, plaintext, data []byte) []byte {
 	gcmInc32(&counter)
 
 	g.counterCrypt(out, plaintext, &counter)
-	g.auth(out[len(plaintext):], out[:len(plaintext)], data, &tagMask)
 
-	return ret[:len(ret)-4]
+	tag := make([]byte, 16)
+	g.auth(tag, out[:len(plaintext)], data, &tagMask)
+	copy(ret[len(ret)-12:], tag)
+
+	return ret
 }
 
 var errOpen = errors.New("cipher: message authentication failed")
