@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// +build gc
+
 // This is an optimized implementation of AES-GCM using AES-NI and CLMUL-NI
 // The implementation uses some optimization as described in:
 // [1] Gueron, S., Kounavis, M.E.: Intel® Carry-Less Multiplication
