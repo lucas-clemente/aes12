@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 // +build amd64
-// +build gc
 
 package aes12
 
